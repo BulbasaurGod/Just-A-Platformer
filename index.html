@@ -1,0 +1,2043 @@
+<!DOCTYPE html>
+<html>
+   <head>
+<title></title>
+  <style>
+  html, body {
+    height: 100%;
+    margin: 0;
+  }
+
+  body {
+    background: black;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  canvas {
+    border: 2px solid white;
+  }
+  </style>
+<style type="text/css">
+.welcome {
+  color:green;
+font-size:36px;
+  font-family:cursive;
+  text-align:center;
+  padding:20px;
+}
+  </style>
+   </head>
+   <body>
+   <canvas id = "game" width = "1200px" height = "400px"></canvas>
+<script>
+    var pause = false
+    var canvas = document.getElementById("game");
+    var ctx = canvas.getContext("2d");
+    var x = 100;
+    var y = 300;
+    var xVelocity = 0;
+    var yVelocity = 0;
+    var oldY = 0;
+    var menu = true
+    const jumpHeight = -12;
+    const gravity = 1;
+    const friction =0.7;
+    const speed = 2.25;
+    const wallJumpH = 0;
+    const wallJumpV = -5;
+    var upPressed = false;
+    var rightPressed = false;
+    var leftPressed = false;
+    var level = 0;
+    var levelPlatform = [6,5,4,10,5,4,6,6,5,4,5,4,8,8,5,4,9,4,8,5,9,3,10,4,5,9,11,1,24,9];
+    var platforms = [];
+    var levelPickups = [2,9,2,0,0,1,0,3,0,0,0,0,0,0,2,1,0,0,0,0,0,0,3,0,0,0,0,0,0,0];
+    var pickups = [];
+    var startPosition = [];
+    var badThings = [];
+    var levelBadThings = [9,3,4,2,7,4,0,11,4,1,10,3,8,8,1,3,9,2,10,2,4,4,1,1,11,9,13,7,0,20];
+    var levelTimer = new Date().getTime()
+    var currentColor = "rgb(255,255,255)"
+    var colorFlash = 0
+    var gameOver = false
+    var levelPointer = 0
+    var levelNames = ["1 The First Trial","2 The Climber's Trial","3 The Collecter's Trial","4 The Lengendary J. A.'s Trial","5 The Collective's Trial","6 The Prankster's Trial","7 The Hidden's Trial","8 The Quick Footed's Trial","9 The Oblivious's Trial","10 The Technaical's Trial","11 The Trapper's Trial","12 The Upgrader's Trial","13 The Collective's 2nd Trial","14 The Technical's Masterpiece Trial","15 The Quick One's Trial","16 The Trapper's Masterpiece Trial","17 The Legendary J. A.'s Improved Trial","18 The Patient One's Trial","19 The Acrobatic One's Trial","20 The Jumper's Trial","21 The Scholar's Trial","22 The Wise One's Trial","23 The Familiar's Trial","24 The Courageous One's Trial","25 The Collective's 3rd Trial","26 The Powerful One's Trial","27 The Annoying One's Trial","28 The Upgrader's Masterpiece Trial","29 The Time Trial","30 The Final Trial"]
+    var tutorial = ["Use UP or W key to Jump","Move into a wall to CLIMB it!","Jump while climbing a wall to WALL JUMP","","","","","","","","","","","","","","","","","","","","","","","","","","",""]
+    var additional = ["Use the LEFT & RIGHT/ S & D keys to move","","","","","","","","","","","","","","","","","","","","","","","","","","","","",""]
+    
+    for(var L = 0; L < levelPlatform.length; L ++){
+        badThings[L]=[]
+        for(var b = 0;b < levelBadThings[L]; b++){
+            badThings[L][b]= {x:0,y:0,width:0,height:0,angle:0,moving:false,x2:0,y2:0,x3:0,y3:0,path:0,speed:1}
+        }
+    }
+    
+    for(var i = 0; i < levelPlatform.length; i ++){
+        startPosition[i]={x:0,y:0,gx:0,gy:0}
+    }
+    
+    for(var L = 0; L < levelPlatform.length; L ++){
+        platforms[L]=[]
+        for(var p = 0; p < levelPlatform[L]; p ++){
+            platforms[L][p]= {
+                x:0, y:0, width:0, height:0, collapsing:false, timer:new Date().getTime(), playerDetected:false, gone:false};
+            
+        }
+    }
+    for(var L = 0; L < levelPlatform.length; L ++){
+        pickups[L]=[]
+        for(var p = 0; p < levelPickups[L]; p ++){
+            pickups[L][p]= {
+                x:0, y:0, active:true};
+            
+        }
+    }
+    
+    
+    
+    function EdgeDetection(){
+        if(x + 1 > canvas.width - 50 || x - 1 < 0 || y + 1 > canvas.height - 50 || y - 1 < 0){
+            return true
+        }
+        
+    }
+    
+    function PlatformDetection(){
+        for(var p = 0; p < levelPlatform[level]; p++){
+            var pL = platforms[level][p]
+            if(sat(x,y,50,50,0,x +25, y +25, pL.x,pL.y,pL.width,pL.height,0,pL.x + pL.width/2, pL.y + pL.height/2) && !pL.gone){
+                if (pL.collapsing && !pL.playerDetected){
+                    pL.timer=new Date().getTime()
+                    pL.playerDetected=true
+                }
+                return true
+            }
+        }
+    }
+    
+    function Move(){
+        y += yVelocity;
+        if(EdgeDetection()|| PlatformDetection()){
+            for(var i = 0; i < Math.abs(yVelocity); i ++){
+                if(EdgeDetection()|| PlatformDetection()){
+                    y += -1*(Math.abs(yVelocity)/yVelocity)
+                }
+            }
+            if(upPressed && yVelocity > 0 ){
+                yVelocity = jumpHeight
+            }else{
+                yVelocity = 0
+            }
+        }else{
+            yVelocity += gravity
+        }
+        if(rightPressed){
+            xVelocity += speed
+        }
+        if(leftPressed){
+            xVelocity -= speed
+        }
+        x += xVelocity
+        if(EdgeDetection()|| PlatformDetection()){
+            oldY = y
+            for(var i = 0; i < Math.abs(xVelocity)+ 1; i ++){
+                if (EdgeDetection()|| PlatformDetection()){
+                    y --
+                }
+            }
+            if(EdgeDetection()|| PlatformDetection()){
+                y = oldY
+                for(var i = 0; i < Math.ceil(Math.abs(xVelocity)); i ++){
+                    if(EdgeDetection()|| PlatformDetection()){
+                        x += -1 *(Math.abs(xVelocity)/xVelocity)
+                    }
+                }
+                if (xVelocity < 0){
+                    xVelocity = 0
+                    if(upPressed){
+                        xVelocity=75
+                        yVelocity=-15
+                    }
+                    else if(leftPressed){
+                        xVelocity = wallJumpH
+                        yVelocity = wallJumpV
+                    }
+                }else{
+                    xVelocity = 0
+                    if(upPressed){
+                        xVelocity=-75
+                        yVelocity=-15
+                    }
+                    else if(rightPressed){
+                        xVelocity = -wallJumpH
+                        yVelocity = wallJumpV
+                    }
+                }
+            }
+        }
+        xVelocity = xVelocity * friction
+    }
+    function DrawGoal(){
+        var count = 0
+        for(var p = 0; p < levelPickups[level]; p++){
+            if (pickups[level][p].active == false){
+                count ++
+            }
+        }
+        var s = startPosition[level];
+        ctx.beginPath()
+        ctx.rect(s.gx,s.gy,10,100)
+        if(count == levelPickups[level]){
+            ctx.rect(s.gx,s.gy+5,50,50)
+        }
+        ctx.fillStyle="white"
+        ctx.fill()
+        ctx.closePath()
+    }
+    function DetectGoal(){
+        var count = 0
+        for (var p = 0; p < levelPickups[level]; p++){
+            if (pickups[level][p].active == false){
+                count ++
+            }
+        }
+        var s = startPosition[level];
+        if(count == levelPickups[level] && sat(x,y,50,50,0,x +25,y + 25,s.gx,s.gy,10,100,0,s.gx +5,s.gy + 50 )){
+            NextLevel()
+            
+        }
+    }
+    function NextLevel(){
+        if(level+1==levelPlatform.length){
+            gameOver = true
+        }
+        else{
+            levelTimer= new Date().getTime()
+            colorFlash=0
+            currentColor="white"
+            level ++
+            levelPointer ++
+            x=startPosition[level].x 
+            y=startPosition[level].y
+            
+        }
+    }
+    function YouWin(){
+        ctx.fillStyle="white"
+        ctx.font="30px Arial"
+        ctx.textAlign="center"
+        ctx.fillText("You win!",canvas.width/2,canvas.height/2)
+    }
+    function DrawBadThings(){
+        for(var p = 0; p < levelBadThings[level]; p++){
+            var pL = badThings[level][p]
+            ctx.beginPath()
+            ctx.save()
+            ctx.translate(pL.x,pL.y)
+            ctx.rotate(pL.angle/180*Math.PI)
+            ctx.rect(-pL.width/2,-pL.height/2,pL.width,pL.height)
+            ctx.fillStyle="black"
+            ctx.fill()
+            ctx.strokeStyle="white"
+            ctx.lineWidth=1
+            ctx.stroke()
+            ctx.restore()
+            ctx.closePath()
+        }
+    }
+    function MoveBadThings(){
+        for(var p = 0; p < levelBadThings[level]; p++){
+            var pL = badThings [level][p]
+            if(pL.moving==true){
+                var angle=Math.atan2(pL.y2-pL.y3,pL.x2-pL.x3)
+                if(pL.path==0){
+                    pL.x+=pL.speed*Math.cos(angle)
+                    pL.y+=pL.speed*Math.sin(angle)
+                    if(pL.x2<pL.x3){
+                        if(pL.x<pL.x2){
+                            pL.path=1
+                        }
+                    }
+                    else{
+                        if(pL.x>pL.x2){
+                            pL.path=1
+                        }
+                    }
+                }
+                if(pL.path==1){
+                    pL.x-=pL.speed*Math.cos(angle)
+                    pL.y-=pL.speed*Math.sin(angle)
+                    if(pL.x2<pL.x3){
+                        if(pL.x>pL.x3){
+                            pL.path=0
+                        }
+                    }
+                    else{
+                        if(pL.x<pL.x3){
+                            pL.path=0
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    
+    function DrawPlatform(){
+        for(var p = 0; p < levelPlatform[level]; p++){
+            var pL = platforms[level][p]
+            if(!pL.gone){
+                ctx.beginPath()
+                ctx.rect(pL.x, pL.y, pL.width, pL.height)
+                ctx.fillStyle=currentColor
+                ctx.fill()
+                if(pL.collapsing){
+                    ctx.strokeStyle="grey"
+                    ctx.lineWidth=3
+                    ctx.stroke()
+                }
+                ctx.closePath()
+            }
+        }
+    }
+    
+    function DrawPickups(){
+        for(var p = 0; p < levelPickups[level]; p++){
+            var pL = pickups[level][p]
+            if (pL.active==true){
+                ctx.beginPath()
+                ctx.rect(pL.x,pL.y,10,10)
+                ctx.fillStyle="grey"
+                ctx.fill()
+                ctx.closePath()
+            }
+        }
+    }
+    
+    function DetectBadThings(){
+        for(var p = 0; p < levelBadThings[level]; p++){
+            var pL = badThings[level][p]
+            if (sat(x,y,50,50,0,x+25,y+25,pL.x-pL.width/2,pL.y-pL.height/2,pL.width,pL.height,pL.angle,pL.x,pL.y)){
+                Reset()
+            }
+        }
+    }
+    
+    function DetectPickup(){
+        for(var p = 0; p < levelPickups[level]; p++){
+            var pL = pickups[level][p]
+            if (sat(x,y,50,50,0,x + 25, y +25,pL.x,pL.y,10,10,0,pL.x + 5, pL.y + 5)){
+                pL.active = false
+            }
+        }
+    }
+    
+    function Reset(){
+        levelTimer=new Date().getTime()
+        colorFlash=0
+        currentColor = "white"
+        x=startPosition[level].x 
+        y=startPosition[level].y
+        for(var p = 0; p < levelPlatform[level]; p++){
+            var pL = platforms[level][p]
+            if (pL.collapsing){
+                pL.playerDetected=false
+                pL.gone=false
+            }
+        }
+        for(var i = 0; i < levelPickups[level]; i++){
+            pickups[level][i].active=true
+        }
+    }
+    
+    function DrawLevelText(){
+        ctx.fillStyle="white"
+        ctx.font="15px Arial"
+        ctx.textAlign="left"
+        ctx.strokeStyle="grey"
+        ctx.lineWidth=1
+        ctx.strokeText(levelNames[levelPointer],10,40)
+    }
+    function DrawTutorialText(){
+        ctx.fillStyle="white"
+        ctx.font="15px Arial"
+        ctx.textAlign="left"
+        ctx.strokeStyle="grey"
+        ctx.lineWidth=1
+        ctx.strokeText(tutorial[levelPointer],10,150)
+    }
+    function DrawAdditionalText(){
+        ctx.fillStyle="white"
+        ctx.font="15px Arial"
+        ctx.textAlign="left"
+        ctx.strokeStyle="grey"
+        ctx.lineWidth=1
+        ctx.strokeText(additional[levelPointer],10,200)
+    }
+    function DrawPauseMessage(){
+        ctx.fillStyle="white"
+        ctx.font== "15px Arial"
+        ctx.textAlign="left"
+        ctx.strokeStyle="grey"
+        ctx.lineWidth=1
+        ctx.strokeText("Press Q to pause",10,20)
+    }
+    function DrawTimer(levelTimer){
+        ctx.fillStyle="white"
+        ctx.font="30px Arial"
+        ctx.textAlign="right"
+        ctx.strokeStyle="grey"
+        ctx.lineWidth=3
+        ctx.strokeText(10 - Math.round((new Date().getTime() - levelTimer)/1000),1190,40)
+        
+    }
+    var pauseTime = 0
+    var flagTime = true
+    
+    function Timer(){
+        if(! pause){
+            if(new Date().getTime()- levelTimer > 8000){
+            if (new Date().getTime() - levelTimer > 8000+ (colorFlash*500)){
+                currentColor=currentColor=="rgb(255,255,255)"?"rgb(255,0,0)":"rgb(255,255,255)"
+                colorFlash++
+            }
+        }
+        
+        if(new Date().getTime()-levelTimer > 10000){
+            Reset()
+        }
+        if(! flagTime){
+            DrawTimer(0)
+            flagTime = true
+        }
+        else{
+            DrawTimer(levelTimer);
+        }
+        
+        }
+        else{
+            if(flagTime){
+                levelTimer = new Date().getTime()
+                flagTime = false
+            }
+        }
+   /* setTimeout(function(){
+        if (levelTimer < 0){
+            levelTimer = 10
+            Reset()
+        }
+        else{
+            --levelTimer
+        }
+    },1000);
+        DrawTimer(levelTimer);
+        }*/
+        
+    }
+
+    
+    
+    function Collapsing(){
+        for(var p = 0; p < levelPlatform[level]; p++){
+            var pL = platforms[level][p]
+            if(pL.collapsing && pL.playerDetected && new Date().getTime()-pL.timer > 500){
+                pL.gone=true
+            }
+        }
+    }
+    
+    function DrawPlayer(){
+        ctx.beginPath();
+        ctx.rect(x,y,50,50);
+        ctx.fillStyle = "white";
+        ctx.fill();
+        ctx.closePath();
+    }
+    document.addEventListener('keyup', event => {
+        if (event.code === 'Space') {
+        menu=false;
+        console.log(menu);
+        }
+    })
+    document.addEventListener('keyup', event => {
+        if (event.code === 'KeyQ') {
+            if (pause){
+                pause = false
+            }
+            else {
+                pause = true
+            }
+        }
+    })
+
+    function GameLoop(){
+        ctx.clearRect(0,0, canvas.width, canvas.height);
+        if(menu){
+            ctx.fillStyle="white"
+        ctx.font="60px Arial"
+        ctx.textAlign="center"
+        ctx.strokeStyle="white"
+        ctx.lineWidth=2
+        ctx.strokeText("Just a Platformer",600,150)
+        
+        ctx.fillStyle="white"
+        ctx.font="30px Arial"
+        ctx.textAlign="center"
+        ctx.strokeText("Press SPACE to start",600,250)
+        
+        
+        }
+        else if(! gameOver && ! pause){
+            DrawPlayer();
+            Move();
+            DrawBadThings();
+            DrawPlatform();
+            DrawPickups();
+            DetectPickup();
+            DrawGoal();
+             DetectGoal();
+             DetectBadThings();
+            MoveBadThings();
+            DrawLevelText();
+            DrawTutorialText();
+            DrawAdditionalText();
+            DrawPauseMessage();
+            Collapsing();
+        }
+        else if(pause){
+        ctx.fillStyle="white"
+        ctx.strokeStyle="white"
+        ctx.font="40px Arial"
+        ctx.textAlign="center"
+        ctx.strokeText("You have paused time itself, congrats.",600,200)
+        }
+        else if(gameOver){
+            console.log("Win check")
+            YouWin()
+        }
+        if(! gameOver){
+            Timer();
+        }
+        requestAnimationFrame(GameLoop);
+    }
+    class vertex{
+        constructor(x,y){
+            this.x=x; this.y=y;
+    
+        }
+    }
+    class line{
+        constructor (v1,v2){
+            this.v1=v1; this.v2=v2;
+        }
+    }
+    function dotProduct(p0,p1,p2){
+        var x0=p0.x, y0=p0.y;
+        var dx1=p1.x-x0,dy1=p1.y-y0;
+        var dx2=p2.x-x0,dy2=p2.y-y0;
+        if(dx1 * dy2 > dy1 * dx2)
+            return + 1;
+        if(dx1 * dy2 < dy1 * dx2)
+            return - 1;
+        if((dx1 * dx2 < 0)||(dy1 * dy2 < 0))
+            return - 1;
+        if(Math.hypot (dx1,dy1)<Math.hypot (dx2,dy2))
+            return + 1
+        return 0;
+    }
+    function lineIntersect(l1,l2){
+        var a = l1.v1, b = l1.v2;
+        var c = l2.v1, d = l2.v2;
+        var b1 = dotProduct(a,b,c) * dotProduct(a,b,d) <= 0
+        var b2 = dotProduct(c,d,a) * dotProduct(c,d,b) <= 0 
+        return b1 && b2
+    }
+    function rotPoint(v1,pivot, vAngle){
+        var newX = (v1.x - pivot.x) * Math.cos(vAngle) - (v1.y - pivot.y) * Math.sin(vAngle) + pivot.x
+        var newY = (v1.x - pivot.x) * Math.sin(vAngle) + (v1.y - pivot.y) * Math.cos(vAngle) + pivot.y
+        return new vertex(newX, newY)
+    }
+    function sat(x1,y1,w1,h1,angle1,centerx1,centery1,x2,y2,w2,h2,angle2,centerx2,centery2){
+        var result = false
+        var object1 =[4]
+        var object2 =[4]
+        var p1 = [4]
+        var p2= [4]
+        p1[0]= new vertex(x1,y1)
+        p1[1]= new vertex(x1+w1,y1)
+        p1[2]= new vertex(x1+w1,y1+h1)
+        p1[3]= new vertex(x1,y1+h1)
+        for(var i = 0; i < 4; i ++){
+          p1[i]=rotPoint(p1[i],new vertex(centerx1,centery1),angle1);
+          
+        }
+        p2[0]= new vertex(x2,y2)
+        p2[1]= new vertex(x2+w2,y2)
+        p2[2]= new vertex(x2+w2,y2+h2)
+        p2[3]= new vertex(x2,y2+h2)
+        for(var i = 0; i < 4; i ++){
+          p2[i]=rotPoint(p2[i],new vertex(centerx2,centery2),angle2);
+          
+        }
+        object1[0]= new line(p1[0],p1[1])
+        object1[1]= new line(p1[1],p1[2])
+        object1[2]= new line(p1[2],p1[3])
+        object1[3]= new line(p1[3],p1[0])
+        object2[0]= new line(p2[0],p2[1])
+        object2[1]= new line(p2[1],p2[2])
+        object2[2]= new line(p2[2],p2[3])
+        object2[3]= new line(p2[3],p2[0])
+         for(var o = 0; o < 4; o ++){
+             for(var t = 0; t < 4; t ++){
+                 if (lineIntersect(object1[o], object2[t])){
+                     result = true
+                     
+                 }
+             }
+         }
+         return result;
+    }
+    document.addEventListener("keydown",keyDown,false);
+    document.addEventListener("keyup",keyUp,false);
+    function keyDown(e){
+        if(e.keyCode == 87 || e.keyCode == 38){
+            e.preventDefault()
+            upPressed = true;
+        }
+        if(e.keyCode == 65 || e.keyCode == 37){
+            leftPressed = true;
+        }
+       else if(e.keyCode == 68 || e.keyCode == 39){
+            rightPressed = true;
+        }
+    }
+    function keyUp(e){
+          if(e.keyCode == 87 || e.keyCode == 38){
+            e.preventDefault()
+            upPressed = false;
+        }
+        if(e.keyCode == 65 || e.keyCode == 37){
+            leftPressed = false;
+        }
+       else if(e.keyCode == 68 || e.keyCode == 39){
+            rightPressed = false;
+        }
+    }
+    function createPlatforms(){
+        platforms[0][0].x=0
+        platforms[0][0].y=canvas.height-40
+        platforms[0][0].width=canvas.width
+        platforms[0][0].height=40
+        platforms[0][1].x=250
+        platforms[0][1].y=canvas.height-90
+        platforms[0][1].width=100
+        platforms[0][1].height=100
+        platforms[0][1].collapsing=false
+        platforms[0][2].x=1010
+        platforms[0][2].y=canvas.height-160
+        platforms[0][2].width=200
+        platforms[0][2].height=150
+        platforms[0][3].x=450
+        platforms[0][3].y=canvas.height-140
+        platforms[0][3].width=100
+        platforms[0][3].height=10
+        platforms[0][4].x=675
+        platforms[0][4].y=canvas.height-150
+        platforms[0][4].width=100
+        platforms[0][4].height=10
+        platforms[0][5].x=900
+        platforms[0][5].y=canvas.height-160
+        platforms[0][5].width=110
+        platforms[0][5].height=10
+        DrawLevelText("test");
+        
+        platforms[1][0].x=0
+        platforms[1][0].y=canvas.height-40
+        platforms[1][0].width=canvas.width
+        platforms[1][0].height=40
+        platforms[1][1].x=250
+        platforms[1][1].y=canvas.height-250
+        platforms[1][1].width=100
+        platforms[1][1].height=250
+        platforms[1][2].x=500
+        platforms[1][2].y=canvas.height-250
+        platforms[1][2].width=100
+        platforms[1][2].height=250
+        platforms[1][3].x=750
+        platforms[1][3].y=canvas.height-250
+        platforms[1][3].width=100
+        platforms[1][3].height=250
+        platforms[1][4].x=1050
+        platforms[1][4].y=canvas.height-295
+        platforms[1][4].width=150
+        platforms[1][4].height=295
+        
+        platforms[2][0].x=0
+        platforms[2][0].y=canvas.height-40
+        platforms[2][0].width=canvas.width
+        platforms[2][0].height=40
+        platforms[2][1].x=550
+        platforms[2][1].y=canvas.height-240
+        platforms[2][1].width=150
+        platforms[2][1].height=200
+        platforms[2][2].x=0
+        platforms[2][2].y=canvas.height-400
+        platforms[2][2].width=400
+        platforms[2][2].height=500
+        platforms[2][3].x=850
+        platforms[2][3].y=canvas.height-400
+        platforms[2][3].width=400
+        platforms[2][3].height=500
+      
+        platforms[3][0].x=1100
+        platforms[3][0].y=canvas.height-50
+        platforms[3][0].width=100
+        platforms[3][0].height=10
+        platforms[3][1].x=850
+        platforms[3][1].y=canvas.height-100
+        platforms[3][1].width=100
+        platforms[3][1].height=10
+        platforms[3][2].x=750
+        platforms[3][2].y=canvas.height-175
+        platforms[3][2].width=50
+        platforms[3][2].height=100
+        platforms[3][3].x=500
+        platforms[3][3].y=canvas.height-50
+        platforms[3][3].width=100
+        platforms[3][3].height=10
+        platforms[3][4].x=300
+        platforms[3][4].y=canvas.height-130
+        platforms[3][4].width=100
+        platforms[3][4].height=10
+        platforms[3][5].x=500
+        platforms[3][5].y=canvas.height-210
+        platforms[3][5].width=100
+        platforms[3][5].height=10
+        platforms[3][6].x=600
+        platforms[3][6].y=canvas.height-400
+        platforms[3][6].width=10
+        platforms[3][6].height=200
+        platforms[3][7].x=250
+        platforms[3][7].y=canvas.height-300
+        platforms[3][7].width=100
+        platforms[3][7].height=10
+        platforms[3][8].x=340
+        platforms[3][8].y=canvas.height-290
+        platforms[3][8].width=10
+        platforms[3][8].height=20
+        platforms[3][9].x=0
+        platforms[3][9].y=canvas.height-240
+        platforms[3][9].width=120
+        platforms[3][9].height=10
+        
+        platforms[4][0].x=0
+        platforms[4][0].y=canvas.height-40
+        platforms[4][0].width=canvas.width
+        platforms[4][0].height=40
+        platforms[4][1].x=0
+        platforms[4][1].y=canvas.height-400
+        platforms[4][1].width=200
+        platforms[4][1].height=400
+        platforms[4][2].x=1000
+        platforms[4][2].y=canvas.height-400
+        platforms[4][2].width=200
+        platforms[4][2].height=400
+        platforms[4][3].x=200
+        platforms[4][3].y=canvas.height-240
+        platforms[4][3].width=700
+        platforms[4][3].height=40
+        platforms[4][4].x=200
+        platforms[4][4].y=canvas.height-250
+        platforms[4][4].width=100
+        platforms[4][4].height=20
+        
+        platforms[5][0].x=0
+        platforms[5][0].y=canvas.height-40
+        platforms[5][0].width=canvas.width
+        platforms[5][0].height=40
+        platforms[5][1].x=0
+        platforms[5][1].y=canvas.height-200
+        platforms[5][1].width=200
+        platforms[5][1].height=200
+        platforms[5][2].x=1000
+        platforms[5][2].y=canvas.height-200
+        platforms[5][2].width=200
+        platforms[5][2].height=200
+        platforms[5][3].x=200
+        platforms[5][3].y=canvas.height-200
+        platforms[5][3].width=800
+        platforms[5][3].height=20
+        platforms[5][3].collapsing=true
+        
+        platforms[6][0].x=0
+        platforms[6][0].y=canvas.height-400
+        platforms[6][0].width=200
+        platforms[6][0].height=400
+        platforms[6][1].x=1000
+        platforms[6][1].y=canvas.height-400
+        platforms[6][1].width=200
+        platforms[6][1].height=400
+        platforms[6][2].x=0
+        platforms[6][2].y=canvas.height-40
+        platforms[6][2].width=canvas.width
+        platforms[6][2].height=40
+        platforms[6][3].x=200
+        platforms[6][3].y=canvas.height-400
+        platforms[6][3].width=800
+        platforms[6][3].height=200
+        platforms[6][4].x=400
+        platforms[6][4].y=canvas.height-200
+        platforms[6][4].width=100
+        platforms[6][4].height=160
+        platforms[6][4].collapsing=true
+        platforms[6][5].x=800
+        platforms[6][5].y=canvas.height-200
+        platforms[6][5].width=100
+        platforms[6][5].height=160
+        platforms[6][5].collapsing=true
+        
+        platforms[7][0].x=0
+        platforms[7][0].y=canvas.height-200
+        platforms[7][0].width=200
+        platforms[7][0].height=400
+        platforms[7][1].x=950.5
+        platforms[7][1].y=canvas.height-200
+        platforms[7][1].width=300
+        platforms[7][1].height=400
+        platforms[7][2].x=0
+        platforms[7][2].y=canvas.height-40
+        platforms[7][2].width=canvas.width
+        platforms[7][2].height=40
+        platforms[7][3].x=350
+        platforms[7][3].y=canvas.height-200
+        platforms[7][3].width=75
+        platforms[7][3].height=10
+        platforms[7][3].collapsing=true
+        platforms[7][4].x=550
+        platforms[7][4].y=canvas.height-300
+        platforms[7][4].width=50
+        platforms[7][4].height=100
+        platforms[7][4].collapsing=true
+        platforms[7][5].x=725
+        platforms[7][5].y=canvas.height-200
+        platforms[7][5].width=75
+        platforms[7][5].height=10
+        platforms[7][5].collapsing=true
+        
+        platforms[8][0].x=0
+        platforms[8][0].y=canvas.height-40
+        platforms[8][0].width=canvas.width
+        platforms[8][0].height=40
+        platforms[8][1].x=0
+        platforms[8][1].y=canvas.height-400
+        platforms[8][1].width=150
+        platforms[8][1].height=400
+        platforms[8][2].x=1050
+        platforms[8][2].y=canvas.height-400
+        platforms[8][2].width=150
+        platforms[8][2].height=400
+        platforms[8][3].x=300
+        platforms[8][3].y=canvas.height-290
+        platforms[8][3].width=600
+        platforms[8][3].height=190
+        platforms[8][4].x=900
+        platforms[8][4].y=canvas.height-290
+        platforms[8][4].width=150
+        platforms[8][4].height=190
+        platforms[8][4].collapsing=true
+        
+        platforms[9][0].x=0
+        platforms[9][0].y=canvas.height-40
+        platforms[9][0].width=canvas.width
+        platforms[9][0].height=40
+        platforms[9][1].x=0
+        platforms[9][1].y=canvas.height -400
+        platforms[9][1].width=canvas.width
+        platforms[9][1].height=200
+        platforms[9][2].x=0
+        platforms[9][2].y=canvas.height -400
+        platforms[9][2].width=200
+        platforms[9][2].height=400
+        platforms[9][3].x=1000
+        platforms[9][3].y=canvas.height -400
+        platforms[9][3].width=200
+        platforms[9][3].height=400
+        
+        platforms[10][0].x=0
+        platforms[10][0].y=canvas.height-40
+        platforms[10][0].width=canvas.width
+        platforms[10][0].height=40
+        platforms[10][1].x=0
+        platforms[10][1].y=canvas.height-150
+        platforms[10][1].width=163
+        platforms[10][1].height=150
+        platforms[10][2].x=912
+        platforms[10][2].y=canvas.height-150
+        platforms[10][2].width=288
+        platforms[10][2].height=150
+        platforms[10][3].x=312
+        platforms[10][3].y=canvas.height-150
+        platforms[10][3].width=153
+        platforms[10][3].height=150
+        platforms[10][4].x=612
+        platforms[10][4].y=canvas.height-150
+        platforms[10][4].width=153
+        platforms[10][4].height=150
+        
+        platforms[11][0].x=0
+        platforms[11][0].y=canvas.height-40
+        platforms[11][0].width=canvas.width
+        platforms[11][0].height=40
+        platforms[11][1].x=0
+        platforms[11][1].y=canvas.height-400
+        platforms[11][1].width=200
+        platforms[11][1].height=400
+        platforms[11][2].x=1000
+        platforms[11][2].y=canvas.height-400
+        platforms[11][2].width=200
+        platforms[11][2].height=400
+        platforms[11][3].x=200
+        platforms[11][3].y=canvas.height-400
+        platforms[11][3].width=800
+        platforms[11][3].height=200
+        
+        platforms[12][0].x=375
+        platforms[12][0].y=canvas.height-295
+        platforms[12][0].width=450
+        platforms[12][0].height=50
+        platforms[12][1].x=595
+        platforms[12][1].y=canvas.height-400
+        platforms[12][1].width=10
+        platforms[12][1].height=105
+        platforms[12][2].x=400
+        platforms[12][2].y=canvas.height-100
+        platforms[12][2].width=400
+        platforms[12][2].height=50
+        platforms[12][3].x=950
+        platforms[12][3].y=canvas.height-100
+        platforms[12][3].width=50
+        platforms[12][3].height=10
+        platforms[12][3].collapsing=true
+        platforms[12][4].x=250
+        platforms[12][4].y=canvas.height-150
+        platforms[12][4].width=50
+        platforms[12][4].height=10
+        platforms[12][4].collapsing=true
+        platforms[12][5].x=125
+        platforms[12][5].y=canvas.height-225
+        platforms[12][5].width=50
+        platforms[12][5].height=10
+        platforms[12][5].collapsing=true
+        setPlatforms(12,6,225,canvas.height-300,50,10,true)
+        
+        setPlatforms(13,0,0,canvas.height-1,canvas.width,1,false)
+        setPlatforms(13,1,0,canvas.height-50,55,5,false)
+        setPlatforms(13,2,0,canvas.height-202.5,569,5,false)
+        setPlatforms(13,3,631,canvas.height-345,5,145,false)
+        setPlatforms(13,4,564,canvas.height-345,5,145,false)
+        setPlatforms(13,5,631,canvas.height-202.5,514,5,false)
+        setPlatforms(13,6,564,canvas.height-345,67,5,false)
+        setPlatforms(13,7,50,canvas.height-50,5,50,false)
+        
+        setPlatforms(14,0,0,canvas.height-40,canvas.width,40,false)
+        setPlatforms(14,1,0,canvas.height-400,canvas.width,40,false)
+        setPlatforms(14,2,200,canvas.height-260,800,120,false)
+        setPlatforms(14,3,0,canvas.height-400,100,400,false)
+        setPlatforms(14,4,1100,canvas.height-400,100,400,false)
+        
+        setPlatforms(15,0,0,canvas.height-40,canvas.width,40,false)
+        setPlatforms(15,1,0,canvas.height-400,100,400,false)
+        setPlatforms(15,2,1100,canvas.height-400,100,400,false)
+        setPlatforms(15,3,0,canvas.height-400,canvas.width,260,false)
+        
+        platforms[16][0].x=1100
+        platforms[16][0].y=canvas.height-50
+        platforms[16][0].width=100
+        platforms[16][0].height=10
+        platforms[16][1].x=850
+        platforms[16][1].y=canvas.height-100
+        platforms[16][1].width=100
+        platforms[16][1].height=10
+        platforms[16][2].x=750
+        platforms[16][2].y=canvas.height-175
+        platforms[16][2].width=50
+        platforms[16][2].height=100
+        platforms[16][3].x=500
+        platforms[16][3].y=canvas.height-50
+        platforms[16][3].width=100
+        platforms[16][3].height=10
+        platforms[16][4].x=300
+        platforms[16][4].y=canvas.height-130
+        platforms[16][4].width=100
+        platforms[16][4].height=10
+        platforms[16][5].x=500
+        platforms[16][5].y=canvas.height-210
+        platforms[16][5].width=50
+        platforms[16][5].height=10
+        platforms[16][5].collapsing=true
+        platforms[16][6].x=275
+        platforms[16][6].y=canvas.height-300
+        platforms[16][6].width=50
+        platforms[16][6].height=10
+        platforms[16][6].collapsing=true
+        platforms[16][7].x=0
+        platforms[16][7].y=canvas.height-240
+        platforms[16][7].width=120
+        platforms[16][7].height=10
+        
+        setPlatforms(17,0,0,canvas.height-340,573,340,false)
+        setPlatforms(17,1,627,canvas.height-400,573,400,false)
+        setPlatforms(17,2,573,canvas.height-335,55,10,true)
+        setPlatforms(17,3,573,canvas.height-40,55,40,false)
+        
+        setPlatforms(18,0,0,canvas.height-40,canvas.width,40,false)
+        setPlatforms(18,1,0,canvas.height-300,300,300,false)
+        setPlatforms(18,2,500,canvas.height-400,10,200,false)
+        setPlatforms(18,3,500,canvas.height-290,300,120,false)
+        setPlatforms(18,4,1050,canvas.height-400,200,400,false)
+        
+        setPlatforms(19,0,0,canvas.height-40,canvas.width,40,false)
+        setPlatforms(19,1,0,canvas.height-400,450,400,false)
+        setPlatforms(19,2,750,canvas.height-280,450,400,false)
+        setPlatforms(19,3,850,canvas.height-400,450,400,false)
+        setPlatforms(19,4,0,canvas.height-400,1200,10,false)
+        
+        setPlatforms(20,0,10,canvas.height-50,100,10,false)
+        setPlatforms(20,1,300,canvas.height-390,10,340,true)
+        setPlatforms(20,2,0,canvas.height-400,80,270,false)
+        setPlatforms(20,3,350,canvas.height-330,100,10,false)
+        setPlatforms(20,4,550,canvas.height-50,150,10,false)
+        setPlatforms(20,5,505,canvas.height-200,10,200,false)
+        setPlatforms(20,6,675,canvas.height-400,10,200,false)
+        setPlatforms(20,7,875,canvas.height-290,10,290,false)
+        setPlatforms(20,8,870,canvas.height-290,350,10,false)
+        
+        setPlatforms(21,0,0,canvas.height-330,200,350,false)
+        setPlatforms(21,1,0,canvas.height-40,canvas.width,40,false)
+        setPlatforms(21,2,612.5,canvas.height-80,canvas.width,40,false)
+        
+        setPlatforms(22,0,0,canvas.height-50,canvas.width,50,false)
+        setPlatforms(22,1,200,canvas.height-225,50,50,false)
+        setPlatforms(22,2,350,canvas.height-225,50,50,true)
+        setPlatforms(22,3,400,canvas.height-225,50,50,false)
+        setPlatforms(22,4,450,canvas.height-225,50,50,true)
+        setPlatforms(22,5,500,canvas.height-225,50,50,false)
+        setPlatforms(22,6,550,canvas.height-225,50,50,true)
+        setPlatforms(22,7,450,canvas.height-410,50,50,false)
+        setPlatforms(22,8,700,canvas.height-175,100,175,false)
+        setPlatforms(22,9,1050,canvas.height-262.5,100,262.5,false)
+        
+        setPlatforms(23,0,400,canvas.height-330,400,75,false)
+        setPlatforms(23,1,0,canvas.height-400,230,400,false)
+        setPlatforms(23,2,970,canvas.height-400,230,400,false)
+        
+        platforms[24][0].x=0
+        platforms[24][0].y=canvas.height-40
+        platforms[24][0].width=canvas.width
+        platforms[24][0].height=40
+        platforms[24][1].x=0
+        platforms[24][1].y=canvas.height-400
+        platforms[24][1].width=200
+        platforms[24][1].height=400
+        platforms[24][2].x=1000
+        platforms[24][2].y=canvas.height-400
+        platforms[24][2].width=200
+        platforms[24][2].height=400
+        platforms[24][3].x=200
+        platforms[24][3].y=canvas.height-240
+        platforms[24][3].width=700
+        platforms[24][3].height=40
+        platforms[24][4].x=200
+        platforms[24][4].y=canvas.height-250
+        platforms[24][4].width=100
+        platforms[24][4].height=20
+        
+        setPlatforms(25,0,0,canvas.height-40,1200,40,false)
+        setPlatforms(25,1,150,canvas.height-90,200,50,false)
+        setPlatforms(25,2,500,canvas.height-200,72,200,false)
+        setPlatforms(25,3,300,canvas.height-400,72,150,false)
+        setPlatforms(25,4,700,canvas.height-400,72,150,false)
+        setPlatforms(25,5,772,canvas.height-400,72,250,false)
+        setPlatforms(25,6,1000,canvas.height-113,72,100,false)
+        setPlatforms(25,7,1000,canvas.height-240,72,72,true)
+        setPlatforms(25,8,1000,canvas.height-400,72,100,false)
+        
+        setPlatforms(26,0,0,canvas.height-40,1200,40,false)
+        setPlatforms(26,1,0,canvas.height-400,72,245,false)
+        setPlatforms(26,2,72,canvas.height-400,72,220,false)
+        setPlatforms(26,3,144,canvas.height-400,72,195,false)
+        setPlatforms(26,4,216,canvas.height-400,72,205,false)
+        setPlatforms(26,5,288,canvas.height-400,72,245,false)
+        setPlatforms(26,6,550,canvas.height-210,72,240,false)
+        setPlatforms(26,7,300,canvas.height-400,500,10,false)
+        setPlatforms(26,8,750,canvas.height-400,450,230,false)
+        
+        setPlatforms(27,0,0,canvas.height-40,1200,40,false)
+        
+        setPlatforms(28,0,0,canvas.height-40,1200,40,false)
+        setPlatforms(28,1,0,canvas.height-270,200,400,false)
+        setPlatforms(28,2,200,canvas.height-270,230,30,false)
+        setPlatforms(28,3,430,canvas.height-270,200,30,true)
+        setPlatforms(28,4,200,canvas.height-145,200,30,true)
+        setPlatforms(28,5,400,canvas.height-145,30,30,false)
+        setPlatforms(28,6,400,canvas.height-240,30,95,true)
+        setPlatforms(28,7,430,canvas.height-145,230,30,false)
+        setPlatforms(28,8,630,canvas.height-400,30,160,false)
+        setPlatforms(28,9,400,canvas.height-115,30,75,false)
+        setPlatforms(28,10,660,canvas.height-145,200,30,true)
+        setPlatforms(28,11,630,canvas.height-115,30,75,true)
+        setPlatforms(28,12,860,canvas.height-270,30,240,false)
+        setPlatforms(28,13,1090,canvas.height-400,30,160,false)
+        setPlatforms(28,14,890,canvas.height-270,200,30,true)
+        setPlatforms(28,15,1090,canvas.height-240,30,95,true)
+        setPlatforms(28,16,950,canvas.height-145,250,30,false)
+        setPlatforms(28,17,890,canvas.height-145,60,30,true)
+        setPlatforms(28,18,660,canvas.height-270,200,30,true)
+        setPlatforms(28,19,630,canvas.height-240,30,95,true)
+        setPlatforms(28,20,400,canvas.height-400,30,130,true)
+        setPlatforms(28,21,860,canvas.height-400,30,130,true)
+        setPlatforms(28,22,1090,canvas.height-115,30,75,true)
+        setPlatforms(28,23,1120,canvas.height-270,80,30,false)
+        
+        setPlatforms(29,0,0,canvas.height-40,600,40,false)
+        setPlatforms(29,1,200,canvas.height-270,36,350,false)
+        setPlatforms(29,2,200,canvas.height-270,200,36,false)
+        setPlatforms(29,3,500,canvas.height-400,36,266,false)
+        setPlatforms(29,4,300,canvas.height-170,200,36,false)
+        setPlatforms(29,5,850,canvas.height-250,150,36,false)
+        setPlatforms(29,6,1145,canvas.height-290,55,36,false)
+        setPlatforms(29,7,850,canvas.height-250,36,150,false)
+    }
+    function setPlatforms(Plevel,number,px,py,width,height,collapse){
+        platforms[Plevel][number].x=px
+        platforms[Plevel][number].y=py
+        platforms[Plevel][number].width=width
+        platforms[Plevel][number].height=height
+        platforms[Plevel][number].collapsing=collapse
+    }
+    function createPickups(){
+        pickups[0][0].x=495
+        pickups[0][0].y=canvas.height-155
+        pickups[0][1].x=720
+        pickups[0][1].y=canvas.height-165
+        
+        pickups[1][0].x=225
+        pickups[1][0].y=canvas.height-155
+        pickups[1][1].x=225
+        pickups[1][1].y=canvas.height-185
+        pickups[1][2].x=225
+        pickups[1][2].y=canvas.height-215
+        pickups[1][3].x=475
+        pickups[1][3].y=canvas.height-155
+        pickups[1][4].x=475
+        pickups[1][4].y=canvas.height-185
+        pickups[1][5].x=475
+        pickups[1][5].y=canvas.height-215
+        pickups[1][6].x=725
+        pickups[1][6].y=canvas.height-155
+        pickups[1][7].x=725
+        pickups[1][7].y=canvas.height-185
+        pickups[1][8].x=725
+        pickups[1][8].y=canvas.height-215
+        
+        pickups[2][0].x=470
+        pickups[2][0].y=canvas.height-60
+        pickups[2][1].x=770
+        pickups[2][1].y=canvas.height-60
+        
+        pickups[5][0].x=600
+        pickups[5][0].y=canvas.height-60
+        
+        pickups[7][0].x=382.5
+        pickups[7][0].y=canvas.height-220
+        pickups[7][1].x=570
+        pickups[7][1].y=canvas.height-320
+        pickups[7][2].x=757.5
+        pickups[7][2].y=canvas.height-220
+        
+        pickups[14][0].x=487.5
+        pickups[14][0].y=canvas.height-280
+        pickups[14][1].x=712.5
+        pickups[14][1].y=canvas.height-280
+        
+        pickups[15][0].x=1050
+        pickups[15][0].y=canvas.height-80
+        
+        pickups[22][0].x=370
+        pickups[22][0].y=canvas.height-240
+        pickups[22][1].x=470
+        pickups[22][1].y=canvas.height-240
+        pickups[22][2].x=570
+        pickups[22][2].y=canvas.height-240
+        
+    }
+    function createKeyitems(){
+        DrawLevelText("Level 1")
+        
+        startPosition[0].x=100
+        startPosition[0].y=300
+        startPosition[0].gx=1100
+        startPosition[0].gy=canvas.height-260
+        
+        startPosition[1].x=100
+        startPosition[1].y=300
+        startPosition[1].gx=1100
+        startPosition[1].gy=canvas.height-395
+        
+        startPosition[2].x=600
+        startPosition[2].y=canvas.height-300
+        startPosition[2].gx=620
+        startPosition[2].gy=canvas.height-340
+        
+        startPosition[3].x=1100
+        startPosition[3].y=canvas.height-100
+        startPosition[3].gx=10
+        startPosition[3].gy=canvas.height-340
+        
+        startPosition[4].x=250
+        startPosition[4].y=canvas.height-100
+        startPosition[4].gx=250
+        startPosition[4].gy=canvas.height-350
+        
+        startPosition[5].x=150
+        startPosition[5].y=canvas.height-300
+        startPosition[5].gx=1050
+        startPosition[5].gy=canvas.height-300
+        
+        startPosition[6].x=250
+        startPosition[6].y=canvas.height-90
+        startPosition[6].gx=925
+        startPosition[6].gy=canvas.height-140
+       
+        startPosition[7].x=100
+        startPosition[7].y=canvas.height-250
+        startPosition[7].gx=1050
+        startPosition[7].gy=canvas.height-300
+        
+        startPosition[8].x=225
+        startPosition[8].y=canvas.height-90
+        startPosition[8].gx=600
+        startPosition[8].gy=canvas.height-390
+        
+        startPosition[9].x=250
+        startPosition[9].y=canvas.height-90
+        startPosition[9].gx=940
+        startPosition[9].gy=canvas.height-140
+        
+        startPosition[10].x=100
+        startPosition[10].y=canvas.height-200
+        startPosition[10].gx=1100
+        startPosition[10].gy=canvas.height-250
+        
+        startPosition[11].x=250
+        startPosition[11].y=canvas.height-90
+        startPosition[11].gx=925
+        startPosition[11].gy=canvas.height-140
+        
+        startPosition[12].x=650
+        startPosition[12].y=canvas.height-345
+        startPosition[12].gx=525
+        startPosition[12].gy=canvas.height-395
+        
+        startPosition[13].x=5
+        startPosition[13].y=canvas.height-100
+        startPosition[13].gx=50
+        startPosition[13].gy=canvas.height-300
+       
+        startPosition[14].x=600
+        startPosition[14].y=canvas.height-100
+        startPosition[14].gx=597.5
+        startPosition[14].gy=canvas.height-140
+        
+        startPosition[15].x=150
+        startPosition[15].y=canvas.height-100
+        startPosition[15].gx=147.5
+        startPosition[15].gy=canvas.height-140
+        
+        startPosition[16].x=1100
+        startPosition[16].y=canvas.height-100
+        startPosition[16].gx=10
+        startPosition[16].gy=canvas.height-340
+        
+        startPosition[17].x=100
+        startPosition[17].y=canvas.height-395
+        startPosition[17].gx=575
+        startPosition[17].gy=canvas.height-140
+        
+        startPosition[18].x=100
+        startPosition[18].y=canvas.height-360
+        startPosition[18].gx=520
+        startPosition[18].gy=canvas.height-390
+        
+        startPosition[19].x=600
+        startPosition[19].y=canvas.height-140
+        startPosition[19].gx=775
+        startPosition[19].gy=canvas.height-375
+        
+        startPosition[20].x=10
+        startPosition[20].y=canvas.height-100
+        startPosition[20].gx=1000
+        startPosition[20].gy=canvas.height-390
+        
+        startPosition[21].x=25
+        startPosition[21].y=canvas.height-390
+        startPosition[21].gx=1000
+        startPosition[21].gy=canvas.height-180
+        
+        startPosition[22].x=100
+        startPosition[22].y=canvas.height-105
+        startPosition[22].gx=1095
+        startPosition[22].gy=canvas.height-362.5
+        
+        startPosition[23].x=575
+        startPosition[23].y=canvas.height-390
+        startPosition[23].gx=575
+        startPosition[23].gy=canvas.height-140
+        
+        startPosition[24].x=250
+        startPosition[24].y=canvas.height-100
+        startPosition[24].gx=250
+        startPosition[24].gy=canvas.height-350
+        
+        startPosition[25].x=25
+        startPosition[25].y=canvas.height-100
+        startPosition[25].gx=1125
+        startPosition[25].gy=canvas.height-140
+        
+        startPosition[26].x=25
+        startPosition[26].y=canvas.height-100
+        startPosition[26].gx=1125
+        startPosition[26].gy=canvas.height-140
+        
+        startPosition[27].x=25
+        startPosition[27].y=canvas.height-100
+        startPosition[27].gx=1125
+        startPosition[27].gy=canvas.height-140
+        
+        startPosition[28].x=25
+        startPosition[28].y=canvas.height-340
+        startPosition[28].gx=1125
+        startPosition[28].gy=canvas.height-140
+        
+        startPosition[29].x=25
+        startPosition[29].y=canvas.height-90
+        startPosition[29].gx=1145
+        startPosition[29].gy=canvas.height-390
+    }
+    
+    //{x:0,y:0,width:0,height:0,angle:0,
+    //if not moving put moving as false
+    //moving:false,x2:0,y2:0,x3:0,y3:0,path:0}
+    
+    //x2,y2 top left, x3, y3 are bottom right
+    
+    //Example: 
+    function createBadThings(){
+        badThings[0][0].x=385
+        badThings[0][0].y=canvas.height-40
+        badThings[0][0].width=50
+        badThings[0][0].height=50
+        badThings[0][0].angle=45
+        badThings[0][0].moving = false
+        badThings[0][1].x=455
+        badThings[0][1].y=canvas.height-40
+        badThings[0][1].width=50
+        badThings[0][1].height=50
+        badThings[0][1].angle=45
+        badThings[0][1].moving = false
+        badThings[0][2].x=525
+        badThings[0][2].y=canvas.height-40
+        badThings[0][2].width=50
+        badThings[0][2].height=50
+        badThings[0][2].angle=45
+        badThings[0][2].moving = false
+        badThings[0][3].x=600
+        badThings[0][3].y=canvas.height-40
+        badThings[0][3].width=50
+        badThings[0][3].height=50
+        badThings[0][3].angle=45
+        badThings[0][3].moving = false
+        badThings[0][4].x=675
+        badThings[0][4].y=canvas.height-40
+        badThings[0][4].width=50
+        badThings[0][4].height=50
+        badThings[0][4].angle=45
+        badThings[0][4].moving = false
+        badThings[0][5].x=750
+        badThings[0][5].y=canvas.height-40
+        badThings[0][5].width=50
+        badThings[0][5].height=50
+        badThings[0][5].angle=45
+        badThings[0][5].moving = false
+        badThings[0][6].x=825
+        badThings[0][6].y=canvas.height-40
+        badThings[0][6].width=50
+        badThings[0][6].height=50
+        badThings[0][6].angle=45
+        badThings[0][6].moving = false
+        badThings[0][7].x=900
+        badThings[0][7].y=canvas.height-40
+        badThings[0][7].width=50
+        badThings[0][7].height=50
+        badThings[0][7].angle=45
+        badThings[0][7].moving = false
+        badThings[0][8].x=975
+        badThings[0][8].y=canvas.height-40
+        badThings[0][8].width=50
+        badThings[0][8].height=50
+        badThings[0][8].angle=45
+        badThings[0][8].moving = false
+
+        badThings[1][0].x=952
+        badThings[1][0].y=canvas.height-40
+        badThings[1][0].width=45
+        badThings[1][0].height=45
+        badThings[1][0].angle=45
+        badThings[1][0].moving = false
+        badThings[1][1].x=885
+        badThings[1][1].y=canvas.height-40
+        badThings[1][1].width=45
+        badThings[1][1].height=45
+        badThings[1][1].angle=45
+        badThings[1][1].moving = false
+        badThings[1][2].x=1019
+        badThings[1][2].y=canvas.height-40
+        badThings[1][2].width=45
+        badThings[1][2].height=45
+        badThings[1][2].angle=45
+        badThings[1][2].moving = false
+       
+        badThings[2][0].x=400
+        badThings[2][0].y=canvas.height-40
+        badThings[2][0].width=50
+        badThings[2][0].height=50
+        badThings[2][0].angle=45
+        badThings[2][0].moving = false
+        badThings[2][1].x=550
+        badThings[2][1].y=canvas.height-40
+        badThings[2][1].width=50
+        badThings[2][1].height=50
+        badThings[2][1].angle=45
+        badThings[2][1].moving = false
+        badThings[2][2].x=700
+        badThings[2][2].y=canvas.height-40
+        badThings[2][2].width=50
+        badThings[2][2].height=50
+        badThings[2][2].angle=45
+        badThings[2][2].moving = false
+        badThings[2][3].x=850
+        badThings[2][3].y=canvas.height-40
+        badThings[2][3].width=50
+        badThings[2][3].height=50
+        badThings[2][3].angle=45
+        badThings[2][3].moving = false
+        
+        badThings[3][0].x=0
+        badThings[3][0].y=canvas.height-20
+        badThings[3][0].width=4000
+        badThings[3][0].height=50
+        badThings[3][0].angle=0
+        badThings[3][0].moving = false
+        badThings[3][1].x=800
+        badThings[3][1].y=canvas.height-125
+        badThings[3][1].width=50
+        badThings[3][1].height=50
+        badThings[3][1].angle=45
+        badThings[3][1].moving = false
+        
+        badThings[4][0].x=400
+        badThings[4][0].y=canvas.height-40
+        badThings[4][0].width=50
+        badThings[4][0].height=50
+        badThings[4][0].angle=45
+        badThings[4][0].moving = false
+        badThings[4][1].x=600
+        badThings[4][1].y=canvas.height-40
+        badThings[4][1].width=50
+        badThings[4][1].height=50
+        badThings[4][1].angle=45
+        badThings[4][1].moving = false
+        badThings[4][2].x=800
+        badThings[4][2].y=canvas.height-40
+        badThings[4][2].width=50
+        badThings[4][2].height=50
+        badThings[4][2].angle=45
+        badThings[4][2].moving = false
+        badThings[4][3].x=900
+        badThings[4][3].y=canvas.height-220
+        badThings[4][3].width=25
+        badThings[4][3].height=25
+        badThings[4][3].angle=45
+        badThings[4][3].moving = false
+        badThings[4][4].x=800
+        badThings[4][4].y=canvas.height-240
+        badThings[4][4].width=50
+        badThings[4][4].height=50
+        badThings[4][4].angle=45
+        badThings[4][4].moving = false
+        badThings[4][5].x=640
+        badThings[4][5].y=canvas.height-240
+        badThings[4][5].width=50
+        badThings[4][5].height=50
+        badThings[4][5].angle=45
+        badThings[4][5].moving = false
+        badThings[4][6].x=350
+        badThings[4][6].y=canvas.height-400
+        badThings[4][6].width=50
+        badThings[4][6].height=50
+        badThings[4][6].angle=45
+        badThings[4][6].moving = false
+        
+        badThings[5][0].x=240
+        badThings[5][0].y=canvas.height-40
+        badThings[5][0].width=50
+        badThings[5][0].height=50
+        badThings[5][0].angle=45
+        badThings[5][0].moving = false
+        badThings[5][1].x=440
+        badThings[5][1].y=canvas.height-40
+        badThings[5][1].width=50
+        badThings[5][1].height=50
+        badThings[5][1].angle=45
+        badThings[5][1].moving = false
+        badThings[5][2].x=765
+        badThings[5][2].y=canvas.height-40
+        badThings[5][2].width=50
+        badThings[5][2].height=50
+        badThings[5][2].angle=45
+        badThings[5][2].moving = false
+        badThings[5][3].x=965
+        badThings[5][3].y=canvas.height-40
+        badThings[5][3].width=50
+        badThings[5][3].height=50
+        badThings[5][3].angle=45
+        badThings[5][3].moving = false
+        
+        badThings[7][0].x=238
+        badThings[7][0].y=canvas.height-40
+        badThings[7][0].width=50
+        badThings[7][0].height=50
+        badThings[7][0].angle=45
+        badThings[7][0].moving = false
+        badThings[7][1].x=313
+        badThings[7][1].y=canvas.height-40
+        badThings[7][1].width=50
+        badThings[7][1].height=50
+        badThings[7][1].angle=45
+        badThings[7][1].moving = false
+        badThings[7][2].x=388
+        badThings[7][2].y=canvas.height-40
+        badThings[7][2].width=50
+        badThings[7][2].height=50
+        badThings[7][2].angle=45
+        badThings[7][2].moving = false
+        badThings[7][3].x=463
+        badThings[7][3].y=canvas.height-40
+        badThings[7][3].width=50
+        badThings[7][3].height=50
+        badThings[7][3].angle=45
+        badThings[7][3].moving = false
+        badThings[7][4].x=538
+        badThings[7][4].y=canvas.height-40
+        badThings[7][4].width=50
+        badThings[7][4].height=50
+        badThings[7][4].angle=45
+        badThings[7][4].moving = false
+        badThings[7][5].x=613
+        badThings[7][5].y=canvas.height-40
+        badThings[7][5].width=50
+        badThings[7][5].height=50
+        badThings[7][5].angle=45
+        badThings[7][5].moving = false
+        badThings[7][6].x=688
+        badThings[7][6].y=canvas.height-40
+        badThings[7][6].width=50
+        badThings[7][6].height=50
+        badThings[7][6].angle=45
+        badThings[7][6].moving = false
+        badThings[7][7].x=763
+        badThings[7][7].y=canvas.height-40
+        badThings[7][7].width=50
+        badThings[7][7].height=50
+        badThings[7][7].angle=45
+        badThings[7][7].moving = false
+        badThings[7][8].x=838
+        badThings[7][8].y=canvas.height-40
+        badThings[7][8].width=50
+        badThings[7][8].height=50
+        badThings[7][8].angle=45
+        badThings[7][8].moving = false
+        badThings[7][9].x=913
+        badThings[7][9].y=canvas.height-40
+        badThings[7][9].width=50
+        badThings[7][9].height=50
+        badThings[7][9].angle=45
+        badThings[7][9].moving = false
+        badThings[7][10].x=988
+        badThings[7][10].y=canvas.height-40
+        badThings[7][10].width=50
+        badThings[7][10].height=50
+        badThings[7][10].angle=45
+        badThings[7][10].moving = false
+       
+        badThings[8][0].x=150
+        badThings[8][0].y=canvas.height-150
+        badThings[8][0].width=50
+        badThings[8][0].height=50
+        badThings[8][0].angle=45
+        badThings[8][0].moving = false
+        badThings[8][1].x=150
+        badThings[8][1].y=canvas.height-225
+        badThings[8][1].width=50
+        badThings[8][1].height=50
+        badThings[8][1].angle=45
+        badThings[8][1].moving = false
+        badThings[8][2].x=300
+        badThings[8][2].y=canvas.height-150
+        badThings[8][2].width=50
+        badThings[8][2].height=50
+        badThings[8][2].angle=45
+        badThings[8][2].moving = false
+        badThings[8][3].x=300
+        badThings[8][3].y=canvas.height-225
+        badThings[8][3].width=50
+        badThings[8][3].height=50
+        badThings[8][3].angle=45
+        badThings[8][3].moving = false
+        
+        badThings[9][0].x=800
+        badThings[9][0].y=canvas.height-40
+        badThings[9][0].width=50
+        badThings[9][0].height=50
+        badThings[9][0].angle=45
+        badThings[9][0].moving = true
+        badThings[9][0].x2=350
+        badThings[9][0].y2=40
+        badThings[9][0].x3=800
+        badThings[9][0].y3=40.1
+        badThings[9][0].path=0
+        badThings[9][0].speed=5
+        
+        
+        badThings[10][0].x=200
+        badThings[10][0].y=canvas.height-40
+        badThings[10][0].width=50
+        badThings[10][0].height=50
+        badThings[10][0].angle=45
+        badThings[10][0].moving = false
+        badThings[10][1].x=275
+        badThings[10][1].y=canvas.height-40
+        badThings[10][1].width=50
+        badThings[10][1].height=50
+        badThings[10][1].angle=45
+        badThings[10][1].moving = false
+        badThings[10][2].x=350
+        badThings[10][2].y=canvas.height-80
+        badThings[10][2].width=50
+        badThings[10][2].height=50
+        badThings[10][2].angle=45
+        badThings[10][2].moving = true
+        badThings[10][2].x2=350
+        badThings[10][2].y2=100
+        badThings[10][2].x3=350.1
+        badThings[10][2].y3=30
+        badThings[10][2].path=0
+        badThings[10][2].speed=0.5
+        badThings[10][3].x=425
+        badThings[10][3].y=canvas.height-80
+        badThings[10][3].width=50
+        badThings[10][3].height=50
+        badThings[10][3].angle=45
+        badThings[10][3].moving = true
+        badThings[10][3].x2=425
+        badThings[10][3].y2=100
+        badThings[10][3].x3=424.5
+        badThings[10][3].y3=30
+        badThings[10][3].path=1
+        badThings[10][3].speed=0.5
+        badThings[10][4].x=500
+        badThings[10][4].y=canvas.height-40
+        badThings[10][4].width=50
+        badThings[10][4].height=50
+        badThings[10][4].angle=45
+        badThings[10][4].moving = false
+        badThings[10][5].x=575
+        badThings[10][5].y=canvas.height-40
+        badThings[10][5].width=50
+        badThings[10][5].height=50
+        badThings[10][5].angle=45
+        badThings[10][5].moving = false
+        badThings[10][6].x=650
+        badThings[10][6].y=canvas.height-150
+        badThings[10][6].width=50
+        badThings[10][6].height=50
+        badThings[10][6].angle=45
+        badThings[10][6].moving = true
+        badThings[10][6].x2=650
+        badThings[10][6].y2=30
+        badThings[10][6].x3=650.1
+        badThings[10][6].y3=100
+        badThings[10][6].path=1
+        badThings[10][6].speed=0.5
+        badThings[10][7].x=725
+        badThings[10][7].y=canvas.height-150
+        badThings[10][7].width=50
+        badThings[10][7].height=50
+        badThings[10][7].angle=45
+        badThings[10][7].moving = true
+        badThings[10][7].x2=725
+        badThings[10][7].y2=30
+        badThings[10][7].x3=724.9
+        badThings[10][7].y3=100
+        badThings[10][7].path=1
+        badThings[10][7].speed=0.5
+        badThings[10][8].x=800
+        badThings[10][8].y=canvas.height-40
+        badThings[10][8].width=50
+        badThings[10][8].height=50
+        badThings[10][8].angle=45
+        badThings[10][8].moving = false
+        badThings[10][9].x=875
+        badThings[10][9].y=canvas.height-40
+        badThings[10][9].width=50
+        badThings[10][9].height=50
+        badThings[10][9].angle=45
+        badThings[10][9].moving = false
+        
+        badThings[11][0].x=375
+        badThings[11][0].y=canvas.height-40
+        badThings[11][0].width=50
+        badThings[11][0].height=50
+        badThings[11][0].angle=45
+        badThings[11][0].moving = true
+        badThings[11][0].x2=375
+        badThings[11][0].y2=200
+        badThings[11][0].x3=374.9
+        badThings[11][0].y3=40
+        badThings[11][0].path=1
+        badThings[11][0].speed=2
+        badThings[11][1].x=550
+        badThings[11][1].y=canvas.height-40
+        badThings[11][1].width=50
+        badThings[11][1].height=50
+        badThings[11][1].angle=45
+        badThings[11][1].moving = true
+        badThings[11][1].x2=550
+        badThings[11][1].y2=200
+        badThings[11][1].x3=549.9
+        badThings[11][1].y3=40
+        badThings[11][1].path=1
+        badThings[11][1].speed=4
+        badThings[11][2].x=725
+        badThings[11][2].y=canvas.height-40
+        badThings[11][2].width=50
+        badThings[11][2].height=50
+        badThings[11][2].angle=45
+        badThings[11][2].moving = true
+        badThings[11][2].x2=725
+        badThings[11][2].y2=200
+        badThings[11][2].x3=724.9
+        badThings[11][2].y3=40
+        badThings[11][2].path=1
+        badThings[11][2].speed=6
+        
+        badThings[12][0].x=0
+        badThings[12][0].y=canvas.height-20
+        badThings[12][0].width=4000
+        badThings[12][0].height=50
+        badThings[12][0].angle=0
+        badThings[12][0].moving = false
+        badThings[12][1].x=825
+        badThings[12][1].y=canvas.height-270
+        badThings[12][1].width=35
+        badThings[12][1].height=35
+        badThings[12][1].angle=45
+        badThings[12][1].moving = false
+        badThings[12][2].x=375
+        badThings[12][2].y=canvas.height-270
+        badThings[12][2].width=35
+        badThings[12][2].height=35
+        badThings[12][2].angle=45
+        badThings[12][2].moving = false
+        badThings[12][3].x=400
+        badThings[12][3].y=canvas.height-75
+        badThings[12][3].width=35
+        badThings[12][3].height=35
+        badThings[12][3].angle=45
+        badThings[12][3].moving = false
+        badThings[12][4].x=800
+        badThings[12][4].y=canvas.height-75
+        badThings[12][4].width=35
+        badThings[12][4].height=35
+        badThings[12][4].angle=45
+        badThings[12][4].moving = false
+        badThings[12][5].x=600
+        badThings[12][5].y=canvas.height-100
+        badThings[12][5].width=50
+        badThings[12][5].height=50
+        badThings[12][5].angle=45
+        badThings[12][5].moving = true
+        badThings[12][5].x2=600
+        badThings[12][5].y2=200
+        badThings[12][5].x3=600.00000001
+        badThings[12][5].y3=40
+        badThings[12][5].path=1
+        badThings[12][5].speed=3
+        badThings[12][6].x=527
+        badThings[12][6].y=canvas.height-100
+        badThings[12][6].width=50
+        badThings[12][6].height=50
+        badThings[12][6].angle=45
+        badThings[12][6].moving = true
+        badThings[12][6].x2=527
+        badThings[12][6].y2=200
+        badThings[12][6].x3=527.00000001
+        badThings[12][6].y3=40
+        badThings[12][6].path=1
+        badThings[12][6].speed=3
+        badThings[12][7].x=673
+        badThings[12][7].y=canvas.height-100
+        badThings[12][7].width=50
+        badThings[12][7].height=50
+        badThings[12][7].angle=45
+        badThings[12][7].moving = true
+        badThings[12][7].x2=673
+        badThings[12][7].y2=200
+        badThings[12][7].x3=673.00000001
+        badThings[12][7].y3=40
+        badThings[12][7].path=1
+        badThings[12][7].speed=3
+        
+        setBadThings(13,0,600,200,50,50,45,true,600,200,0,400,0,7.5)
+        setBadThings(13,1,600,200,50,50,45,true,600,200,0,200,0,7.125)
+        setBadThings(13,2,600,200,50,50,45,true,600,200,0,0,0,7.5)
+        setBadThings(13,3,600,200,50,50,45,true,600,200,1200,400,0,7.5)
+        setBadThings(13,4,600,200,50,50,45,true,600,200,1200,200,0,7.125)
+        setBadThings(13,5,600,200,50,50,45,true,600,200,1200,0,0,7.5)
+        setBadThings(13,6,600,200,50,50,45,true,600,200,600.00000001,400,0,2.3625)
+        setBadThings(13,7,600,200,50,50,45,true,600,200,600.00000001,0,0,2.3625)
+        
+        setBadThings(14,0,1050,90,100,100,0,true,1050,
+        90,150,90.00000001,1,6)
+        
+        setBadThings(15,0,350,90,200,200,0,true,350,
+        75,350.01,240,1,2)
+        setBadThings(15,1,750,90,200,200,0,true,750,
+        75,750.01,240,1,2)
+        setBadThings(15,2,550,270,200,200,0,true,550,
+        240,550.01,75,0,2)
+        
+        badThings[16][0].x=0
+        badThings[16][0].y=canvas.height-20
+        badThings[16][0].width=4000
+        badThings[16][0].height=50
+        badThings[16][0].angle=0
+        badThings[16][0].moving = false
+        badThings[16][1].x=800
+        badThings[16][1].y=canvas.height-125
+        badThings[16][1].width=50
+        badThings[16][1].height=50
+        badThings[16][1].angle=45
+        badThings[16][1].moving = false
+        setBadThings(16,2,860,300,13,13,45,false)
+        setBadThings(16,3,880,300,13,13,45,false)
+        setBadThings(16,4,510,350,13,13,45,false)
+        setBadThings(16,5,530,350,13,13,45,false)
+        setBadThings(16,6,310,270,13,13,45,false)
+        setBadThings(16,7,330,270,13,13,45,false)
+        setBadThings(16,8,595,0,10,400,0,false)
+        
+        setBadThings(17,0,700,225,50,50,45,true,700,
+        225,500,225.00000001,1,3)
+        setBadThings(17,1,700,155,50,50,45,true,700,
+        155,500,155.00000001,1,3)
+        
+        setBadThings(18,0,300,136,50,50,45,false)
+        setBadThings(18,1,300,211,50,50,45,false)
+        setBadThings(18,2,500,173.5,50,50,45,false)
+        setBadThings(18,3,550,360,50,50,45,false)
+        setBadThings(18,4,650,230,50,50,45,false)
+        setBadThings(18,5,750,360,50,50,45,false)
+        setBadThings(18,6,1012,360,50,50,45,false)
+        setBadThings(18,7,1050,38,50,50,45,false)
+        setBadThings(18,8,1050,112,50,50,45,false)
+        
+        setBadThings(19,0,450,300,50,50,45,false)
+        setBadThings(19,1,750,175,50,50,45,false)
+        
+        setBadThings(20,0,600,380,1200,40,0,false)
+        setBadThings(20,1,510,200,50,50,45,false)
+        setBadThings(20,2,680,200,50,50,45,false)
+        
+        setBadThings(21,0,350,360,50,50,45,false)
+        setBadThings(21,1,425,360,50,50,45,false)
+        setBadThings(21,2,500,360,50,50,45,false)
+        setBadThings(21,3,575,360,50,50,45,false)
+        
+        setBadThings(22,0,650,350,50,50,45,true,600,
+        350,350,350.00000001,1,3)
+        
+        setBadThings(23,0,600,380,740,40,0,false)
+        
+        badThings[24][0].x=400
+        badThings[24][0].y=canvas.height-40
+        badThings[24][0].width=50
+        badThings[24][0].height=50
+        badThings[24][0].angle=45
+        badThings[24][0].moving = false
+        badThings[24][1].x=600
+        badThings[24][1].y=canvas.height-40
+        badThings[24][1].width=50
+        badThings[24][1].height=50
+        badThings[24][1].angle=45
+        badThings[24][1].moving = false
+        badThings[24][2].x=800
+        badThings[24][2].y=canvas.height-40
+        badThings[24][2].width=50
+        badThings[24][2].height=50
+        badThings[24][2].angle=45
+        badThings[24][2].moving = false
+        badThings[24][3].x=900
+        badThings[24][3].y=canvas.height-220
+        badThings[24][3].width=25
+        badThings[24][3].height=25
+        badThings[24][3].angle=45
+        badThings[24][3].moving = false
+        badThings[24][4].x=867
+        badThings[24][4].y=canvas.height-240
+        badThings[24][4].width=45
+        badThings[24][4].height=45
+        badThings[24][4].angle=45
+        badThings[24][4].moving = false
+        badThings[24][5].x=802
+        badThings[24][5].y=canvas.height-240
+        badThings[24][5].width=45
+        badThings[24][5].height=45
+        badThings[24][5].angle=45
+        badThings[24][5].moving = false
+        badThings[24][6].x=350
+        badThings[24][6].y=canvas.height-400
+        badThings[24][6].width=50
+        badThings[24][6].height=50
+        badThings[24][6].angle=45
+        badThings[24][6].moving = false
+        badThings[24][7].x=737
+        badThings[24][7].y=canvas.height-240
+        badThings[24][7].width=45
+        badThings[24][7].height=45
+        badThings[24][7].angle=45
+        badThings[24][7].moving = false
+        badThings[24][8].x=400
+        badThings[24][8].y=canvas.height-40
+        badThings[24][8].width=50
+        badThings[24][8].height=50
+        badThings[24][8].angle=45
+        badThings[24][8].moving = true
+        badThings[24][8].x2=400
+        badThings[24][8].y2=50
+        badThings[24][8].x3=400.00000001
+        badThings[24][8].y3=-110
+        badThings[24][8].path=1
+        badThings[24][8].speed=3
+        badThings[24][9].x=600
+        badThings[24][9].y=canvas.height-40
+        badThings[24][9].width=50
+        badThings[24][9].height=50
+        badThings[24][9].angle=45
+        badThings[24][9].moving = true
+        badThings[24][9].x2=600
+        badThings[24][9].y2=50
+        badThings[24][9].x3=600.00000001
+        badThings[24][9].y3=-110
+        badThings[24][9].path=1
+        badThings[24][9].speed=3
+        badThings[24][10].x=800
+        badThings[24][10].y=canvas.height-40
+        badThings[24][10].width=50
+        badThings[24][10].height=50
+        badThings[24][10].angle=45
+        badThings[24][10].moving = true
+        badThings[24][10].x2=800
+        badThings[24][10].y2=50
+        badThings[24][10].x3=800.00000001
+        badThings[24][10].y3=-110
+        badThings[24][10].path=1
+        badThings[24][10].speed=3
+        
+        setBadThings(25,0,186,310,50,50,45)
+        setBadThings(25,1,536,200,50,50,45)
+        setBadThings(25,2,466,360,50,50,45)
+        setBadThings(25,3,336,150,50,50,45)
+        setBadThings(25,4,736,150,50,50,45)
+        setBadThings(25,5,606,360,50,50,45)
+        setBadThings(25,6,808,250,50,50,45)
+        setBadThings(25,7,1036,287,50,50,45)
+        setBadThings(25,8,1036,100,50,50,45)
+        
+        setBadThings(26,0,36,245,50,50,45)
+        setBadThings(26,1,108,220,50,50,45)
+        setBadThings(26,2,180,195,50,50,45)
+        setBadThings(26,3,180,360,50,50,45)
+        setBadThings(26,4,252,205,50,50,45)
+        setBadThings(26,5,324,245,50,50,45)
+        setBadThings(26,6,550,324,50,50,45)
+        setBadThings(26,7,586,190,50,50,45)
+        setBadThings(26,8,586,10,50,50,45)
+        setBadThings(26,9,750,50,50,50,45)
+        setBadThings(26,10,750,122,50,50,45)
+        setBadThings(26,11,750,194,50,50,45)
+        setBadThings(26,12,1000,360,50,50,45)
+        
+        setBadThings(27,0,200,360,100,100,45,true,200,
+        360,200.01,0,1,5)
+        setBadThings(27,1,340,0,100,100,45,true,340,
+        0,340.01,360,1,5)
+        setBadThings(27,2,480,360,100,100,45,true,480,
+        360,480.01,0,1,5)
+        setBadThings(27,3,620,0,100,100,45,true,620,
+        0,620.01,360,1,5)
+        setBadThings(27,4,760,360,100,100,45,true,760,
+        360,760.01,0,1,5)
+        setBadThings(27,5,900,0,100,100,45,true,900,
+        0,900.01,360,1,5)
+        setBadThings(27,6,900,360,60,60,45,true,900,
+        360,200,360.01,1,8)
+        
+        setBadThings(29,0,900,380,600,40,0)
+        setBadThings(29,1,200,320,50,50,45)
+        setBadThings(29,2,0,264,50,50,45)
+        setBadThings(29,3,200,166,50,50,45)
+        setBadThings(29,4,280,130,50,50,45,true,280,130,356,130.01,1,3)
+        setBadThings(29,5,350,150,20,20,45,true,350,150,350.01,250,1,2)
+        setBadThings(29,6,266,360,50,50,45,true,266,360,266.01,420,1,2)
+        setBadThings(29,7,400,267,30,30,45)
+        setBadThings(29,8,490,360,30,30,45)
+        setBadThings(29,9,530,240,30,30,45,true,530,240,530.01,40,1,2)
+        setBadThings(29,10,886,150,50,50,45,true,886,150,962,150.01,1,1)
+        
+    }
+    function setBadThings(blevel,number,bx,by,width,height,angle,moving=false,bx2=0,by2=0,bx3=0,by3=0,path=0,speed=0){
+        badThings[blevel][number].x=bx
+        badThings[blevel][number].y=by
+        badThings[blevel][number].width=width
+        badThings[blevel][number].height=height
+        badThings[blevel][number].angle=angle
+        badThings[blevel][number].moving=moving
+        badThings[blevel][number].x2=bx2
+        badThings[blevel][number].y2=by2
+        badThings[blevel][number].x3=bx3
+        badThings[blevel][number].y3=by3
+        badThings[blevel][number].path=path
+        badThings[blevel][number].speed=speed
+    }
+    createPickups()
+    createPlatforms()
+    createKeyitems()
+    x=startPosition[level].x 
+    y=startPosition[level].y
+    createBadThings()
+    GameLoop();
+</script>
+<body>
+</html>
